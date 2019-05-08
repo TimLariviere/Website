@@ -1,82 +1,3 @@
-// module Blog.Client.Main
-
-// open Elmish
-// open Bolero
-// open Bolero.Html
-// open Bolero.Templating.Client
-// open Bolero.Remoting
-// open Blog.Client.RemoteServices
-// open Blog.Client.Models
-// open Blog.Client.Routing
-
-// type Model =
-//     { Page: Page
-//       Posts: Post array option
-//       ErrorMessage: string option }
-
-// type Message =
-//     | SetPage of Page
-//     | PageLoaded
-//     | GotPosts of Post array
-//     | Error of exn
-
-// let router = Router.infer SetPage (fun m -> m.Page)
-
-// let initModel =
-//     { Page = Home
-//       Posts = None
-//       ErrorMessage = None }
-
-// let update postService message model =
-//     match message with
-//     | SetPage page -> { model with Page = page }, Cmd.none
-//     | PageLoaded -> model, (Cmd.ofAsync postService.getPosts () GotPosts Error)
-//     | GotPosts posts -> { model with Posts = Some posts }, Cmd.none
-//     | Error exn -> { model with ErrorMessage = Some exn.Message }, Cmd.none
-
-// let mainView model dispatch =
-//     div [] [
-//         match model.ErrorMessage, model.Posts with
-//         | Some errorMessage, _ ->
-//             yield text errorMessage
-//         | None, None ->
-//             yield text "Loading..."
-//         | None, Some posts ->
-//             yield ul [] [
-//                 for post in posts do
-//                     yield li [] [
-//                         div [] [
-//                             a [ router.HRef (BlogPost post.Id) ] [
-//                                text post.Title
-//                             ]
-//                         ]
-//                     ]
-//             ]
-//     ]
-
-// let blogPostView blogPostId model dispatch =
-//     div [] [
-//         text blogPostId
-//     ]
-
-// let view model dispatch =
-//     match model.Page with
-//     | Home | BlogHome -> mainView model dispatch
-//     | BlogPost blogPostId -> printfn "Should display BlogPost %s" blogPostId; blogPostView blogPostId model dispatch
-
-// type MyApp() =
-//     inherit ProgramComponent<Model, Message>()
-
-//     override this.Program =
-//         let postService = this.Remote<PostService>()
-//         let update = update postService
-
-//         Program.mkProgram (fun _ -> initModel, Cmd.ofMsg PageLoaded) update view
-//         |> Program.withRouter router
-// #if DEBUG
-//         |> Program.withHotReloading
-// #endif
-
 module Blog.Client.Main
 
 open Bolero
@@ -94,27 +15,36 @@ type Page =
 
 type Model =
     { Page: Page
-      Posts: Post array option
+      PostListings: PostListing array option
+      Post: Post option option
       ErrorMessage: string option }
 
 type Message =
     | SetPage of Page
     | PageLoaded
-    | GotPosts of Post array
+    | GotPostListings of PostListing array
+    | GotPost of Post option
     | Error of exn
 
 let router = Router.infer SetPage (fun m -> m.Page)
 
 let initModel =
     { Page = Home
-      Posts = None
+      PostListings = None
+      Post = None
       ErrorMessage = None }
 
 let update postService message model =
     match message with
-    | SetPage page -> { model with Page = page }, Cmd.none
-    | PageLoaded -> model, (Cmd.ofAsync postService.getPosts () GotPosts Error)
-    | GotPosts posts -> { model with Posts = Some posts }, Cmd.none
+    | SetPage page ->
+        let cmd =
+            match page with
+            | BlogPost postId -> Cmd.ofAsync postService.tryGetPost postId GotPost Error
+            | _ -> Cmd.none
+        { model with Page = page }, cmd
+    | PageLoaded -> model, (Cmd.ofAsync postService.getPostListings () GotPostListings Error)
+    | GotPostListings posts -> { model with PostListings = Some posts }, Cmd.none
+    | GotPost post -> { model with Post = Some post }, Cmd.none
     | Error exn -> { model with ErrorMessage = Some exn.Message }, Cmd.none
 
 let mainView model dispatch =
@@ -122,7 +52,7 @@ let mainView model dispatch =
         yield text "Home"
         yield br []
         yield
-            match model.ErrorMessage, model.Posts with
+            match model.ErrorMessage, model.PostListings with
             | None, None -> a [ router.HRef (BlogPost "loading")] [ text "Loading posts..." ]
             | Some errorMessage, _ -> text errorMessage
             | None, Some posts ->
@@ -134,17 +64,29 @@ let mainView model dispatch =
                 ]
     ]
 
-let postView postId model dispatch =
-    div [] [
-        text postId
-        br []
-        a [ router.HRef Home ] [ text "Go to home" ]
-    ]
+let postView model dispatch =
+    match model.Post with
+    | None ->
+        div [] [
+            text "Loading"
+        ]
+    | Some None ->
+        div [] [
+            text "Post not found"
+        ]  
+    | Some (Some post) ->    
+        div [] [
+            text post.Title
+            br []
+            text post.Content
+            br []
+            a [ router.HRef Home ] [ text "Go to home" ]
+        ]
 
 let view model dispatch =
     match model.Page with
     | Home | BlogHome -> mainView model dispatch
-    | BlogPost postId -> postView postId model dispatch
+    | BlogPost _ -> postView model dispatch
 
 type MyApp() =
     inherit ProgramComponent<Model, Message>()

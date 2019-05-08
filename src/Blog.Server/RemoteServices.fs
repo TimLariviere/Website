@@ -4,21 +4,33 @@ open Microsoft.AspNetCore.Hosting
 open Bolero.Remoting.Server
 open System.IO
 open Bolero
-open Blog.Client.Models
 open FSharpx.Control
 
 module RemoteServices =
+    let private tryReadFileAsync path = 
+        match File.Exists path with
+        | false -> async.Return None
+        | true ->
+            File.ReadAllTextAsync path
+            |> Async.AwaitTask
+            |> Async.map (Json.Deserialize >> Some)
+
     type PostService(env: IHostingEnvironment) =
         inherit RemoteHandler<Blog.Client.RemoteServices.PostService>()
 
-        let posts =
-            Path.Combine(env.ContentRootPath, "data/posts.json")
-            |> (File.ReadAllTextAsync >> Async.AwaitTask)
-            |> Async.map Json.Deserialize<Post[]>
+        let postListings =
+            Path.Combine(env.ContentRootPath, "data/post-listings.json")
+            |> tryReadFileAsync
+            |> Async.map Option.get
 
         override this.Handler =
             { 
-                getPosts = fun () -> async {
-                    return! posts
+                getPostListings = fun () -> async {
+                    return! postListings
+                }
+                tryGetPost = fun id -> async {
+                    return!
+                        Path.Combine(env.ContentRootPath, (sprintf "data/%s.json" id))
+                        |> tryReadFileAsync
                 }
             }

@@ -7,7 +7,10 @@ module RemoteServices =
     type PostService =
         {
             /// Get the list of all posts
-            getPosts: unit -> Async<Post[]>
+            getPostListings: unit -> Async<PostListing[]>
+
+            /// Get the post with the corresponding id
+            tryGetPost: PostId -> Async<Post option> 
         }
         interface IRemoteService with
             member __.BasePath = "/posts"
