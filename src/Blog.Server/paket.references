@@ -1,0 +1,5 @@
+Microsoft.AspNetCore.Blazor.Server
+Microsoft.AspNetCore.App
+Bolero.Server
+FSharp.Core
+FSharpx.Async

@@ -1,0 +1,8 @@
+FSharp.Core
+Microsoft.AspNetCore.Blazor.Build
+Microsoft.AspNetCore.Blazor.Cli
+Bolero
+  exclude Bolero.Server.dll
+Bolero.HotReload
+  exclude Bolero.Templating.Server.dll
+Bolero.Build
